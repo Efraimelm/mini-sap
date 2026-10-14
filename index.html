@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini SAP GUI</title>
+<style>
+  :root {
+    --bg: #f7f7f7;
+    --hdr: #ffffff;
+    --line: #c6c6c6;
+    --line2: #dcdcdc;
+    --blue: #346187;
+    --blue2: #427cac;
+    --sel: #d9e7f4;
+    --hl: #fff3b8;
+    --txt: #333;
+    --muted: #666;
+    --field: #fff;
+    --field-ro: #f2f2f2;
+    --btn: #f7f7f7;
+    --btnb: #bfbfbf;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #dfe3e8;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    font-size: 12px; color: var(--txt);
+    overflow: hidden; user-select: none;
+  }
+  #win { display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
+
+  /* menu bar */
+  .menubar { display: flex; align-items: center; height: 26px; background: var(--hdr); border-bottom: 1px solid var(--line2); padding: 0 6px; }
+  .menubar .m { padding: 3px 8px; cursor: default; position: relative; }
+  .menubar .m:hover { background: #e5f0fa; }
+  .menubar .sap-logo { margin-left: auto; font: bold 13px Arial; color: #fff; background: linear-gradient(#1c8ad8, #0c5ea8); padding: 1px 6px; clip-path: polygon(0 0,100% 0,82% 100%,0 100%); padding-right: 12px; }
+  .dropdown { position: absolute; top: 24px; left: 0; background: #fff; border: 1px solid #a5a5a5; box-shadow: 2px 3px 6px rgba(0,0,0,.2); min-width: 210px; z-index: 50; padding: 2px 0; }
+  .dropdown div { padding: 4px 22px; white-space: nowrap; }
+  .dropdown div:hover { background: #e5f0fa; }
+  .dropdown div.dis { color: #aaa; }
+  .dropdown div.dis:hover { background: none; }
+
+  /* system toolbar */
+  .systb { display: flex; align-items: center; height: 32px; background: var(--hdr); border-bottom: 1px solid var(--line2); padding: 0 6px; gap: 2px; }
+  .ib { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 2px; cursor: pointer; background: none; padding: 0; }
+  .ib:hover { border-color: #9fb6cd; background: #e5f0fa; }
+  .ib:disabled { opacity: .35; cursor: default; }
+  .ib:disabled:hover { border-color: transparent; background: none; }
+  .sep { width: 1px; height: 20px; background: var(--line2); margin: 0 5px; }
+  .cmd { display: flex; align-items: center; height: 22px; border: 1px solid var(--btnb); background: #fff; margin-right: 4px; }
+  .cmd input { border: 0; outline: 0; width: 150px; height: 20px; padding: 0 4px; font: 12px "Segoe UI", Tahoma, Arial; }
+  .cmd .arr { width: 16px; height: 20px; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--line2); color: #555; font-size: 9px; cursor: pointer; }
+  .cmd:focus-within { border-color: var(--blue2); box-shadow: 0 0 0 1px var(--blue2) inset; }
+
+  /* title */
+  .titlebar { height: 36px; display: flex; align-items: center; padding: 0 12px; background: var(--hdr); border-bottom: 1px solid var(--line2); }
+  .titlebar h1 { margin: 0; font-size: 17px; font-weight: normal; color: var(--blue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* application toolbar */
+  .apptb { min-height: 30px; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: #f2f2f2; border-bottom: 1px solid var(--line2); }
+  .tbtn { height: 22px; display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border: 1px solid transparent; border-radius: 2px; background: none; font: 12px "Segoe UI", Tahoma, Arial; color: var(--txt); cursor: pointer; }
+  .tbtn:hover { border-color: #9fb6cd; background: #e5f0fa; }
+
+  /* content */
+  .content { flex: 1; display: flex; min-height: 0; }
+  .tree { width: 230px; border-right: 1px solid var(--line); background: #fff; display: flex; flex-direction: column; }
+  .tree .th { padding: 5px 8px; background: #f2f2f2; border-bottom: 1px solid var(--line); font-weight: 600; }
+  .tree ul { list-style: none; margin: 0; padding: 4px 0 0 0; }
+  .tree li { padding: 2px 6px; white-space: nowrap; cursor: default; display: flex; align-items: center; gap: 4px; }
+  .tree li .lbl { padding: 1px 3px; }
+  .tree li.on .lbl { background: var(--sel); outline: 1px dotted #555; }
+  .tree li.cur .lbl { font-weight: 600; }
+  .tree .twig { width: 12px; color: #777; font-size: 9px; text-align: center; }
+  .main { flex: 1; overflow: auto; padding: 10px 12px; min-width: 0; }
+
+  /* fields */
+  .frow { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+  .flabel { width: 170px; color: var(--txt); }
+  .fld { height: 20px; line-height: 18px; border: 1px solid var(--btnb); background: var(--field); padding: 0 4px; min-width: 40px; display: inline-block; white-space: nowrap; overflow: hidden; }
+  .fld.ro { background: var(--field-ro); border-color: #d0d0d0; }
+  .ftext { color: var(--txt); }
+  .chk { width: 13px; height: 13px; border: 1px solid #8f8f8f; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1; color: #222; vertical-align: middle; }
+  .chk.ro { background: #f2f2f2; border-color: #b5b5b5; }
+  .group { border: 1px solid var(--line); background: #fff; margin: 10px 0; }
+  .group .gt { padding: 4px 8px; background: #f2f2f2; border-bottom: 1px solid var(--line); font-weight: 600; color: var(--blue); }
+  .group .gb { padding: 6px 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+  .group .gb.one { grid-template-columns: 1fr; }
+
+  /* table control */
+  .tc { border: 1px solid var(--line); background: #fff; display: inline-block; max-width: 100%; }
+  .tc-scroll { overflow: auto; max-height: calc(100vh - 230px); }
+  table.grid { border-collapse: separate; border-spacing: 0; }
+  table.grid th { position: sticky; top: 0; z-index: 2; background: #eaeaea; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); font-weight: normal; text-align: left; padding: 3px 5px; white-space: nowrap; color: #222; }
+  table.grid td { border-right: 1px solid var(--line2); border-bottom: 1px solid var(--line2); padding: 0 3px; height: 22px; white-space: nowrap; }
+  table.grid td .cell { height: 18px; line-height: 16px; border: 1px solid #cfcfcf; background: #fff; padding: 0 3px; overflow: hidden; }
+  table.grid td .cell.key { background: var(--field-ro); border-color: #dedede; }
+  table.grid td.c { text-align: center; }
+  table.grid th.rs, table.grid td.rs { width: 16px; min-width: 16px; padding: 0; position: sticky; left: 0; background: #eaeaea; z-index: 1; border-right: 1px solid var(--line); }
+  table.grid th.rs { z-index: 3; }
+  td.rs .rsb { width: 14px; height: 20px; margin: 0 auto; border: 1px solid #b8b8b8; background: linear-gradient(#fafafa, #e3e3e3); cursor: pointer; }
+  tr.sel td { background: var(--sel); }
+  tr.sel td.rs .rsb { background: var(--blue2); border-color: var(--blue); }
+  tr.sel td .cell { background: #eaf2fa; }
+  tr.hl td { background: var(--hl); }
+  tr.hl td .cell { background: #fffbe3; }
+  tr.hl td .cell.hit { outline: 2px solid #e8a400; outline-offset: -1px; }
+  .tcfoot { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .btn { height: 22px; padding: 0 10px; border: 1px solid var(--btnb); background: linear-gradient(#fff, #ededed); border-radius: 2px; font: 12px "Segoe UI", Tahoma, Arial; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .btn:hover { border-color: var(--blue2); }
+  .entry { color: var(--muted); }
+
+  /* status bar */
+  .statusbar { height: 24px; display: flex; align-items: center; background: #ededed; border-top: 1px solid var(--line); padding: 0 6px; gap: 6px; }
+  .statusbar .msg { flex: 1; display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; }
+  .statusbar .sys { display: flex; gap: 0; color: #444; }
+  .statusbar .sys span { padding: 0 10px; border-left: 1px solid var(--line); }
+
+  /* easy access */
+  .ea { display: flex; flex: 1; min-height: 0; }
+  .ea .eatree { width: 360px; background: #fff; border-right: 1px solid var(--line); overflow: auto; padding: 6px 0; }
+  .ea .eatree li { padding: 2px 8px; }
+  .ea .eaimg { flex: 1; background: radial-gradient(ellipse at 70% 40%, #ffffff 0, #e8eef4 45%, #d5dfe9 100%); display: flex; align-items: center; justify-content: center; }
+  .ea .eaimg .lg { font: bold 64px Arial; color: rgba(52,97,135,.13); letter-spacing: 4px; }
+
+  /* modal */
+  .ovl { position: fixed; inset: 0; background: rgba(0,0,0,.08); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .dlg { background: var(--bg); border: 1px solid #7a7a7a; box-shadow: 3px 4px 14px rgba(0,0,0,.3); min-width: 380px; }
+  .dlg .dt { background: #fff; border-bottom: 1px solid var(--line2); padding: 6px 10px; color: var(--blue); font-size: 14px; display: flex; justify-content: space-between; }
+  .dlg .db { padding: 14px 14px 10px; }
+  .dlg .db input { height: 20px; width: 220px; border: 1px solid var(--btnb); padding: 0 4px; font: 12px "Segoe UI", Tahoma, Arial; outline: 0; }
+  .dlg .db input:focus { border-color: var(--blue2); box-shadow: 0 0 0 1px var(--blue2) inset; }
+  .dlg .df { border-top: 1px solid var(--line2); padding: 6px 10px; display: flex; justify-content: flex-end; gap: 4px; background: #f2f2f2; }
+
+  /* roteiro (painel do exercício) */
+  .side { position: fixed; top: 0; right: 0; bottom: 0; width: 340px; background: #fff; border-left: 1px solid #9aa9b8; box-shadow: -4px 0 14px rgba(0,0,0,.12); z-index: 80; display: flex; flex-direction: column; transform: translateX(100%); transition: transform .2s; user-select: text; }
+  .side.open { transform: none; }
+  .side .sh { padding: 10px 12px; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .side .sh button { background: none; border: 0; color: #fff; font-size: 16px; cursor: pointer; }
+  .side .sb { flex: 1; overflow: auto; padding: 10px 12px; }
+  .step { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #eee; line-height: 1.45; }
+  .step .ck { flex: none; width: 16px; height: 16px; border: 1px solid #8f8f8f; border-radius: 2px; margin-top: 1px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; }
+  .step.done .ck { background: #2b7d2b; border-color: #2b7d2b; }
+  .step.done .tx { color: #777; }
+  .step.manual .ck { cursor: pointer; }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+  .chip { font-size: 11px; padding: 0 5px; border: 1px solid #bbb; border-radius: 8px; color: #777; }
+  .chip.ok { border-color: #2b7d2b; color: #2b7d2b; background: #eef7ee; }
+  .side h3 { font-size: 12px; color: var(--blue); margin: 14px 0 4px; }
+  .side textarea { width: 100%; height: 150px; resize: vertical; font: 12px Consolas, monospace; border: 1px solid var(--btnb); padding: 6px; }
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+  .flow b { border: 1px solid var(--blue2); background: #eef4fa; color: var(--blue); padding: 2px 6px; border-radius: 3px; font-weight: 600; }
+  .tab-rot { position: fixed; right: 0; top: 140px; z-index: 70; writing-mode: vertical-rl; background: var(--blue); color: #fff; padding: 10px 5px; border-radius: 4px 0 0 4px; cursor: pointer; font-size: 12px; }
+  kbd { font: 11px Consolas, monospace; border: 1px solid #bbb; border-radius: 2px; padding: 0 3px; background: #f6f6f6; }
+</style>
+</head>
+<body>
+<div id="win">
+  <div class="menubar" id="menubar"></div>
+  <div class="systb">
+    <button class="ib" title="Enter" data-a="enter" id="okbtn"></button>
+    <div class="cmd"><input id="cmd" spellcheck="false" autocomplete="off"><span class="arr">&#9660;</span></div>
+    <button class="ib" title="Gravar (Ctrl+S)" data-a="save" id="i-save"></button>
+    <div class="sep"></div>
+    <button class="ib" title="Voltar (F3)" data-a="back" id="i-back"></button>
+    <button class="ib" title="Encerrar (Shift+F3)" data-a="exit" id="i-exit"></button>
+    <button class="ib" title="Cancelar (F12)" data-a="cancel" id="i-cancel"></button>
+    <div class="sep"></div>
+    <button class="ib" title="Imprimir (Ctrl+P)" data-a="none" id="i-print"></button>
+    <button class="ib" title="Procurar (Ctrl+F)" data-a="find" id="i-find"></button>
+    <button class="ib" title="Continuar procura (Ctrl+G)" data-a="findnext" id="i-findnext"></button>
+    <div class="sep"></div>
+    <button class="ib" title="Primeira página (Ctrl+Page Up)" data-a="top" id="i-first"></button>
+    <button class="ib" title="Página anterior (Page Up)" data-a="pgup" id="i-prev"></button>
+    <button class="ib" title="Página seguinte (Page Down)" data-a="pgdn" id="i-next"></button>
+    <button class="ib" title="Última página (Ctrl+Page Down)" data-a="bottom" id="i-last"></button>
+    <div class="sep"></div>
+    <button class="ib" title="Criar novo modo" data-a="none" id="i-sess"></button>
+    <button class="ib" title="Criar atalho" data-a="none" id="i-short"></button>
+    <div class="sep"></div>
+    <button class="ib" title="Ajuda (F1)" data-a="help" id="i-help"></button>
+    <button class="ib" title="Roteiro do exercício" data-a="roteiro" id="i-rot"></button>
+  </div>
+  <div class="titlebar"><h1 id="title"></h1></div>
+  <div class="apptb" id="apptb"></div>
+  <div class="content" id="content"></div>
+  <div class="statusbar">
+    <div class="msg" id="msg"></div>
+    <div class="sys"><span>&#9655; DEV (1) 800</span><span>sapdev01</span><span>INS</span></div>
+  </div>
+</div>
+
+<div class="tab-rot" id="tabrot">Roteiro do exercício</div>
+<aside class="side" id="side">
+  <div class="sh"><span>Roteiro — Determinação de preço</span><button id="closeside" title="Fechar">&times;</button></div>
+  <div class="sb">
+    <div id="steps"></div>
+    <h3>Caderno (anotações)</h3>
+    <textarea id="notes" placeholder="Ex.: PR00 = etapa 11&#10;K004 = etapa ...&#10;Seq. acesso PR00 = ..."></textarea>
+    <h3>Fluxo (passo 7)</h3>
+    <button class="btn" id="showflow">Mostrar gabarito</button>
+    <div class="flow" id="flow" hidden>
+      <b>OV</b>&rarr;<b>RVAA01</b>&rarr;<b>PR00</b>&rarr;<b>PR02</b>&rarr;<b>A305 / A306 / A304</b>&rarr;<b>valor</b>
+    </div>
+    <p style="color:#777;margin-top:16px">Atalhos: <kbd>Enter</kbd> executar · <kbd>F3</kbd> voltar · <kbd>Ctrl+F</kbd> procurar · <kbd>Ctrl+G</kbd> continuar procura · <kbd>F2</kbd> detalhe</p>
+  </div>
+</aside>
+
+<script>
+/* ================= ÍCONES ================= */
+const IC = {
+  enter: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#3d9a3d"/><path d="M4.5 8.3l2.3 2.3 4.7-4.9" stroke="#fff" stroke-width="1.8" fill="none"/></svg>',
+  save: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="1" fill="#5b7fa6"/><rect x="4.5" y="2" width="7" height="4.5" fill="#fff"/><rect x="4" y="9" width="8" height="5" fill="#dfe8f1"/></svg>',
+  back: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#3d9a3d"/><path d="M9.5 4.5L6 8l3.5 3.5" stroke="#fff" stroke-width="2" fill="none"/></svg>',
+  exit: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#e6a700"/><path d="M4.5 9.5L8 6l3.5 3.5" stroke="#fff" stroke-width="2" fill="none"/></svg>',
+  cancel: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#d23c3c"/><path d="M5.3 5.3l5.4 5.4M10.7 5.3l-5.4 5.4" stroke="#fff" stroke-width="1.8"/></svg>',
+  print: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="4" y="2" width="8" height="4" fill="#fff" stroke="#666"/><rect x="2" y="6" width="12" height="6" rx="1" fill="#777"/><rect x="4" y="10" width="8" height="4" fill="#fff" stroke="#666"/></svg>',
+  find: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.2" fill="#eaf3fb" stroke="#4a6f95" stroke-width="1.6"/><path d="M9.6 9.6l4.2 4.2" stroke="#4a6f95" stroke-width="2.2"/></svg>',
+  findnext: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="6" cy="6" r="3.8" fill="#eaf3fb" stroke="#4a6f95" stroke-width="1.5"/><path d="M8.8 8.8l3 3" stroke="#4a6f95" stroke-width="2"/><path d="M11 13h4M13 11v4" stroke="#3d9a3d" stroke-width="1.6"/></svg>',
+  first: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 3h10M4 12l4-5 4 5" stroke="#555" stroke-width="1.6" fill="none"/></svg>',
+  prev: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 11l4-5 4 5" stroke="#555" stroke-width="1.6" fill="none"/></svg>',
+  next: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 5l4 5 4-5" stroke="#555" stroke-width="1.6" fill="none"/></svg>',
+  last: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 13h10M4 4l4 5 4-5" stroke="#555" stroke-width="1.6" fill="none"/></svg>',
+  sess: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1.5" y="3" width="10" height="9" fill="#fff" stroke="#4a6f95"/><rect x="1.5" y="3" width="10" height="2" fill="#4a6f95"/><path d="M12 9v6M9 12h6" stroke="#3d9a3d" stroke-width="1.8"/></svg>',
+  short: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="#fff" stroke="#888"/><path d="M5 11l6-6M7 5h4v4" stroke="#4a6f95" stroke-width="1.6" fill="none"/></svg>',
+  help: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#4a7fb5"/><text x="8" y="12" font-size="10" font-weight="bold" text-anchor="middle" fill="#fff" font-family="Arial">?</text></svg>',
+  rot: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="1.5" width="10" height="13" rx="1" fill="#fff" stroke="#4a6f95"/><path d="M5 5h6M5 8h6M5 11h4" stroke="#4a6f95"/></svg>',
+  detail: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.2" fill="#fff" stroke="#4a6f95" stroke-width="1.6"/><path d="M9.6 9.6l4.2 4.2" stroke="#4a6f95" stroke-width="2.2"/></svg>',
+  pen: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 13l1-3 7-7 2 2-7 7z" fill="#e6b84a" stroke="#8a6a1a"/><path d="M5 11l1 1" stroke="#8a6a1a"/></svg>',
+  newent: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="10" height="12" fill="#fff" stroke="#888"/><path d="M11 8v7M7.5 11.5h7" stroke="#3d9a3d" stroke-width="1.8"/></svg>',
+  copy: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="8" height="10" fill="#fff" stroke="#888"/><rect x="6" y="5" width="8" height="10" fill="#fff" stroke="#4a6f95"/></svg>',
+  del: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 5h8l-1 9H5z" fill="#ddd" stroke="#777"/><path d="M3 4h10M6 4V2.5h4V4" stroke="#777" fill="none"/></svg>',
+  undo: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M5 6h5a3 3 0 010 6H6" stroke="#4a6f95" stroke-width="1.6" fill="none"/><path d="M6 3L3 6l3 3" stroke="#4a6f95" stroke-width="1.6" fill="none"/></svg>',
+  selall: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="#fff" stroke="#777"/><path d="M4 4h8M4 7h8M4 10h8" stroke="#427cac" stroke-width="2"/></svg>',
+  selblk: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="#fff" stroke="#777"/><path d="M4 7h8M4 10h8" stroke="#427cac" stroke-width="2"/></svg>',
+  desel: '<svg width="16" height="16" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" fill="#fff" stroke="#777"/><path d="M4 4h8M4 7h8M4 10h8" stroke="#ccc" stroke-width="2"/></svg>',
+  folder: '<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 2h5l1.5 1.5H15V13H1z" fill="#e8c35a" stroke="#b08a25"/></svg>',
+  folderopen: '<svg width="16" height="14" viewBox="0 0 16 14"><path d="M1 2h5l1.5 1.5H14V5H3.5L1 12z" fill="#e8c35a" stroke="#b08a25"/><path d="M3.5 5H16l-2.5 8H1z" fill="#f3d77f" stroke="#b08a25"/></svg>',
+  tx: '<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" fill="#fff" stroke="#4a6f95"/><path d="M3 4h8M3 7h8M3 10h5" stroke="#4a6f95"/></svg>',
+  star: '<svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1l1.8 3.8 4.2.5-3.1 2.9.8 4.1L7 10.3 3.3 12.3l.8-4.1L1 5.3l4.2-.5z" fill="#f2c94c" stroke="#b08a25"/></svg>',
+  msgS: '<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#3d9a3d"/><path d="M4.5 8.3l2.3 2.3 4.7-4.9" stroke="#fff" stroke-width="1.8" fill="none"/></svg>',
+  msgE: '<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#d23c3c"/><path d="M8 4v5" stroke="#fff" stroke-width="2"/><circle cx="8" cy="11.5" r="1.1" fill="#fff"/></svg>',
+  msgW: '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 1l7 13H1z" fill="#e6a700"/><path d="M8 5.5v4" stroke="#fff" stroke-width="1.8"/><circle cx="8" cy="11.8" r="1" fill="#fff"/></svg>',
+  msgI: '<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#4a7fb5"/><path d="M8 7v5" stroke="#fff" stroke-width="2"/><circle cx="8" cy="4.6" r="1.1" fill="#fff"/></svg>',
+};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+[['okbtn','enter'],['i-save','save'],['i-back','back'],['i-exit','exit'],['i-cancel','cancel'],['i-print','print'],['i-find','find'],['i-findnext','findnext'],['i-first','first'],['i-prev','prev'],['i-next','next'],['i-last','last'],['i-sess','sess'],['i-short','short'],['i-help','help'],['i-rot','rot']]
+  .forEach(([id, ic]) => $('#' + id).innerHTML = IC[ic]);
+
+/* ================= DADOS ================= */
+const PROCEDURES = [
+  ['RVAA01','Padrão'], ['RVAA02','Padrão com lista de preços'], ['RVAAUS','Padrão - EUA'],
+  ['RVAB01','Impostos incluídos no preço'], ['RVAB02','Preço bruto com impostos'], ['RVAC01','Fatura de nota de crédito'],
+  ['RVAJ00','Padrão - Japão'], ['RVBONU','Liquidação de bônus'], ['RVCA01','Ordem de devolução'],
+  ['RVCXUS','Taxas externas - EUA'], ['RVIV01','Faturamento interno'], ['RVWIA1','Faturamento intercompany'],
+  ['ZVAA01','Esquema do curso (cópia RVAA01)'],
+].map(([proc, desc]) => ({proc, desc}));
+
+// etapa, cont, tipo, denominação, de, até, man, obr, est, subtot, req, fCalc, fBase, chave, prov
+const STEPS_RVAA01 = [
+  [8,0,'EK01','Custos efetivos','','','','','X','B','2','','','',''],
+  [11,0,'PR00','Preço','','','','X','','','2','','','ERL',''],
+  [13,0,'PB00','Preço bruto','','','X','','','','2','','','ERL',''],
+  [14,0,'PR02','Preço com escala de intervalo','','','','','','','2','','','ERL',''],
+  [20,0,'VA00','Variantes','','','','','','','2','','','ERL',''],
+  [100,0,'','Preço bruto','','','','','','1','','','','',''],
+  [101,0,'KA00','Ação de venda','','','','','','','2','','','ERS',''],
+  [102,0,'K032','Preço grupo/material','','','','','','','2','','','ERS',''],
+  [103,0,'K005','Cliente/material','','','','','','','2','','','ERS',''],
+  [104,0,'K007','Desconto cliente','','','','','','','2','','','ERS',''],
+  [105,0,'K004','Material','','','','','','','2','','','ERS',''],
+  [106,0,'K020','Grupo de preço','','','','','','','2','','','ERS',''],
+  [107,0,'K029','Grupo de materiais','','','','','','','2','','','ERS',''],
+  [108,0,'K030','Cliente/grupo material','','','','','','','2','','','ERS',''],
+  [109,0,'K031','Grupo preço/grupo mat.','','','','','','','2','','','ERS',''],
+  [110,0,'RB00','Desconto (valor)','','','X','','','','2','','','ERS',''],
+  [111,0,'RC00','Desconto quantidade','','','X','','','','2','','','ERS',''],
+  [112,0,'RD00','Desconto peso','','','X','','','','2','','','ERS',''],
+  [300,0,'','Valor de desconto','101','299','','','','','','','','',''],
+  [800,0,'','Valor líquido 1','','','','','','2','','','','',''],
+  [810,0,'HA00','Desconto percentual','','','X','','','','','','','ERS',''],
+  [811,0,'HB00','Desconto (valor)','','','X','','','','','','','ERS',''],
+  [815,0,'KF00','Frete','','','','','','','','','','ERF',''],
+  [820,0,'HM00','Valor da ordem','','','X','','','','','','','ERL',''],
+  [895,0,'PN00','Preço líquido','','','X','','','','2','','','ERL',''],
+  [900,0,'','Valor líquido 2','','','','','','3','','','','',''],
+  [901,0,'BO01','Bônus de grupo','','','','','X','','24','','','ERB','ERU'],
+  [902,0,'BO02','Bônus de material','','','','','X','','24','','','ERB','ERU'],
+  [903,0,'BO03','Bônus de cliente','','','','','X','','24','','','ERB','ERU'],
+  [904,0,'BO04','Bônus hierarquia','','','','','X','','24','','','ERB','ERU'],
+  [905,0,'BO05','Bônus hierarquia/mat.','','','','','X','','24','','','ERB','ERU'],
+  [908,0,'','Valor líquido 3','','','','','','','','','','',''],
+  [909,0,'PI01','Preço intercompany','','','','','X','','22','','','',''],
+  [910,0,'PI02','Pr. intercompany %','','','','','X','','22','','','',''],
+  [914,0,'SKTV','Desconto pag. antecipado','','','','','','','14','','2','ERS',''],
+  [915,0,'MWST','Imposto de saída','','','','','','','10','','16','MWS',''],
+  [919,0,'DIFF','Diferença arredondamento','','','','','','','13','','','ERS',''],
+  [920,0,'','Total','','','','','','A','','4','','',''],
+  [930,0,'SKTO','Desconto financeiro','','','','','X','','9','','11','',''],
+  [935,0,'GRWR','Valor estatístico','','','','','X','C','8','','2','',''],
+  [940,0,'VPRS','Custo interno','','','','','X','B','4','','','',''],
+  [941,0,'EK02','Custos calculados','','','X','','X','','','','','',''],
+  [942,0,'EK03','Custos adicionais calc.','','','X','','X','','','','','',''],
+  [950,0,'','Margem de lucro','','','','','','','','11','','',''],
+].map(r => ({step:r[0], cnt:r[1], ctyp:r[2], desc:r[3], from:r[4], to:r[5], man:r[6], mand:r[7], stat:r[8], sub:r[9], req:r[10], fcalc:r[11], fbase:r[12], acc:r[13], accr:r[14]}));
+
+// tipo cond: denominação, seq. acesso, classe, regra cálculo, tipo condição
+const CTYPES = [
+  ['AMIW','Valor mínimo','', 'A','B','', ''],
+  ['AZWB','Pagamento antecipado','', 'A','B','', ''],
+  ['BO01','Bônus de grupo','BO01','C','A','', 'Bônus'],
+  ['BO02','Bônus de material','BO02','C','A','', 'Bônus'],
+  ['BO03','Bônus de cliente','BO03','C','A','', 'Bônus'],
+  ['DIFF','Diferença arredondamento','','A','B','', 'Arredondamento'],
+  ['EK01','Custos efetivos','','B','C','', ''],
+  ['EK02','Custos calculados','','B','C','', ''],
+  ['GRWR','Valor estatístico','GRWR','B','C','', ''],
+  ['HA00','Desconto percentual','','A','A','', ''],
+  ['HB00','Desconto (valor)','','A','B','', ''],
+  ['HM00','Valor da ordem','','B','B','', ''],
+  ['K004','Material','K004','A','C','', ''],
+  ['K005','Cliente/material','K005','A','C','', ''],
+  ['K007','Desconto cliente','K007','A','A','', ''],
+  ['K020','Grupo de preço','K020','A','A','', ''],
+  ['K029','Grupo de materiais','K029','A','D','', ''],
+  ['K030','Cliente/grupo material','K030','A','A','', ''],
+  ['K031','Grupo preço/grupo mat.','K031','A','A','', ''],
+  ['K032','Preço grupo/material','K032','A','C','', ''],
+  ['KA00','Ação de venda','KA00','A','A','', ''],
+  ['KF00','Frete','KF00','A','D','', 'Frete'],
+  ['MWST','Imposto de saída','MWST','D','A','', 'Imposto'],
+  ['PB00','Preço bruto','PR02','B','C','', ''],
+  ['PI01','Preço intercompany','PI01','B','C','', ''],
+  ['PN00','Preço líquido','','B','C','', ''],
+  ['PR00','Preço','PR02','B','C','', ''],
+  ['PR02','Preço com escala intervalo','PR02','B','C','', ''],
+  ['RA00','Desconto % s/ líquido','','A','A','', ''],
+  ['RB00','Desconto (valor)','','A','B','', ''],
+  ['RC00','Desconto quantidade','','A','C','', ''],
+  ['RD00','Desconto peso','','A','D','', ''],
+  ['SKTO','Desconto financeiro','','E','A','', 'Desconto financeiro'],
+  ['VA00','Variantes','VA00','B','C','', ''],
+  ['VPRS','Custo interno','','B','C','', 'Custo'],
+].map(r => ({ctyp:r[0], desc:r[1], seq:r[2], cls:r[3], calc:r[4], rnd:r[5], cat:r[6]}));
+const CLASS_TXT = {A:'Descontos ou acréscimos', B:'Preços', C:'Despesas de expedição', D:'Impostos', E:'Rendimentos extras'};
+const CALC_TXT = {A:'Percentual', B:'Montante fixo', C:'Quantidade', D:'Peso bruto', E:'Peso líquido'};
+
+const ACCSEQ = [
+  ['0001','Preço - lista de preços'], ['0002','Grupo/material'], ['0003','Cliente'],
+  ['BO01','Bônus grupo'], ['BO02','Bônus material'], ['BO03','Bônus cliente'],
+  ['GRWR','Valor estatístico'], ['K004','Material'], ['K005','Cliente/material'], ['K007','Cliente'],
+  ['K020','Grupo de preço'], ['K029','Grupo de materiais'], ['K030','Cliente/grupo mat.'], ['K031','Grupo preço/grupo mat.'],
+  ['K032','Grupo preço/material'], ['KA00','Ação de venda'], ['KF00','Frete'], ['MWST','Imposto de saída'],
+  ['PI01','Preço intercompany'], ['PR01','Preço (sem status liberação)'], ['PR02','Preço com status de liberação'], ['VA00','Variantes'],
+].map(([seq, desc]) => ({seq, desc}));
+
+// Nº, tabela, descrição, condição (requisito), exclusivo
+const ACCESSES = {
+  PR02: [[10,'305','Cliente/material com status de liberação','','X'], [20,'306','Lista de preços/moeda/material c/status liberação','','X'], [30,'304','Material com status de liberação','','X']],
+  PR01: [[10,'005','Cliente/material','','X'], [20,'006','Lista de preços/moeda/material','','X'], [30,'004','Material','','X']],
+  K004: [[10,'004','Material','','X']],
+  K005: [[10,'005','Cliente/material','','X']],
+  K007: [[10,'007','Divisão/cliente','','X']],
+  K020: [[10,'020','Grupo de preço','','X']],
+  K029: [[10,'029','Grupo de materiais','','X']],
+  K030: [[10,'030','Cliente/grupo material','','X']],
+  K031: [[10,'031','Grupo de preço/grupo material','','X']],
+  K032: [[10,'032','Grupo de preço/material','','X']],
+  KA00: [[10,'046','Ação de venda/material','','X']],
+  KF00: [[10,'017','Cliente/material/lista','','X']],
+  MWST: [[10,'078','País de saída/país de destino','','X'], [20,'011','Impostos nacionais','','X']],
+  VA00: [[10,'032','Grupo de preço/material','','X']],
+};
+const FIELDS = {
+  '305': [['VKORG','Organização de vendas','KOMK','VKORG'],['VTWEG','Canal de distribuição','KOMK','VTWEG'],['KUNNR','Cliente','KOMK','KUNNR'],['MATNR','Material','KOMP','PMATN'],['KFRST','Status de liberação','KOMP','KFRST']],
+  '306': [['VKORG','Organização de vendas','KOMK','VKORG'],['VTWEG','Canal de distribuição','KOMK','VTWEG'],['PLTYP','Tipo de lista de preços','KOMK','PLTYP'],['WAERK','Moeda do documento','KOMK','WAERK'],['MATNR','Material','KOMP','PMATN'],['KFRST','Status de liberação','KOMP','KFRST']],
+  '304': [['VKORG','Organização de vendas','KOMK','VKORG'],['VTWEG','Canal de distribuição','KOMK','VTWEG'],['MATNR','Material','KOMP','PMATN'],['KFRST','Status de liberação','KOMP','KFRST']],
+  '004': [['VKORG','Organização de vendas','KOMK','VKORG'],['VTWEG','Canal de distribuição','KOMK','VTWEG'],['MATNR','Material','KOMP','PMATN']],
+  '005': [['VKORG','Organização de vendas','KOMK','VKORG'],['VTWEG','Canal de distribuição','KOMK','VTWEG'],['KUNNR','Cliente','KOMK','KUNNR'],['MATNR','Material','KOMP','PMATN']],
+  '007': [['VKORG','Organização de vendas','KOMK','VKORG'],['VTWEG','Canal de distribuição','KOMK','VTWEG'],['SPART','Setor de atividade','KOMK','SPART'],['KUNNR','Cliente','KOMK','KUNNR']],
+  '078': [['ALAND','País de saída','KOMK','ALAND'],['LAND1','País de destino','KOMK','LAND1']],
+};
+
+/* ================= ESTADO ================= */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('minisap.' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('minisap.' + k, JSON.stringify(v)); } catch {} },
+};
+const progress = Object.assign({s1:true, s2:false, s3:false, s4:[], s5:false, s6:false, s7:false}, store.get('progress', {}));
+let stack = [];               // pilha de telas da transação atual
+let tcode = '';
+let lastFind = '';
+let dlgOpen = false;
+
+/* ================= TELAS ================= */
+const SCREENS = {
+  home: {
+    title: () => 'SAP Easy Access',
+    menu: ['Menu','Processar','Favoritos','Suplementos','Sistema','Ajuda'],
+    toolbar: () => tb([['', 'none', 'Outro menu', IC.tx], ['', 'none', 'Criar papel', IC.newent], ['', 'none', 'Atribuir usuários', IC.copy], ['', 'none', 'Documentação', IC.help]]),
+    render: () => homeHtml(),
+  },
+
+  v08_list: {
+    title: () => "Modificar visão 'Procedimentos': síntese",
+    menu: ['Visão de tabela','Processar','Ir para','Seleção','Utilitários','Sistema','Ajuda'],
+    toolbar: () => vmToolbar(false),
+    tree: () => [{id:'proc', label:'Procedimentos', lvl:0, cur:true}, {id:'steps', label:'Etapas de controle', lvl:1}],
+    cols: [{k:'proc', l:'Procedimento', w:90, key:true}, {k:'desc', l:'Descrição', w:300}],
+    rows: () => PROCEDURES,
+    render: (s) => gridHtml(s, 'Procedimentos'),
+  },
+
+  v08_steps: {
+    title: () => "Modificar visão 'Etapas de controle': síntese",
+    menu: ['Visão de tabela','Processar','Ir para','Seleção','Utilitários','Sistema','Ajuda'],
+    toolbar: () => vmToolbar(false),
+    tree: () => [{id:'proc', label:'Procedimentos', lvl:0}, {id:'steps', label:'Etapas de controle', lvl:1, cur:true}],
+    cols: [
+      {k:'step', l:'Etapa', w:44, key:true}, {k:'cnt', l:'Con...', w:30, key:true}, {k:'ctyp', l:'TpCd', w:44},
+      {k:'desc', l:'Denominação', w:170}, {k:'from', l:'De', w:34}, {k:'to', l:'Até', w:34},
+      {k:'man', l:'Man.', ck:true}, {k:'mand', l:'Obr.', ck:true}, {k:'stat', l:'Est.', ck:true},
+      {k:'pr', l:'Imprimir', w:44}, {k:'sub', l:'Subtot.', w:40}, {k:'req', l:'Req...', w:32},
+      {k:'fcalc', l:'FórmCálc', w:44}, {k:'fbase', l:'FórmBase', w:44}, {k:'acc', l:'ChvCt', w:40}, {k:'accr', l:'Prov.', w:40},
+    ],
+    rows: (p) => p.proc === 'RVAA01' || p.proc === 'ZVAA01' ? STEPS_RVAA01 : STEPS_RVAA01.filter(r => ['PR00','MWST','K004','K007','SKTO','VPRS',''].includes(r.ctyp)),
+    render: (s) => {
+      const pr = PROCEDURES.find(x => x.proc === s.p.proc);
+      return `<div class="frow" style="margin-bottom:8px"><span class="flabel" style="width:90px">Procedimento</span><span class="fld ro" style="width:70px">${esc(s.p.proc)}</span><span class="ftext">${esc(pr ? pr.desc : '')}</span></div>`
+        + `<div style="color:var(--blue);font-weight:600;margin:6px 0 4px">Referência etapa: síntese</div>` + gridHtml(s, 'Etapas de controle');
+    },
+  },
+
+  v06_list: {
+    title: () => "Modificar visão 'Condições: tipos de condição': síntese",
+    menu: ['Visão de tabela','Processar','Ir para','Seleção','Utilitários','Sistema','Ajuda'],
+    toolbar: () => vmToolbar(true),
+    cols: [{k:'ctyp', l:'TpCd', w:50, key:true}, {k:'desc', l:'Denominação', w:260}],
+    rows: () => CTYPES,
+    render: (s) => gridHtml(s, 'Tipos de condição'),
+  },
+
+  v06_detail: {
+    title: () => "Modificar visão 'Condições: tipos de condição': detalhe",
+    menu: ['Visão de tabela','Processar','Ir para','Seleção','Utilitários','Sistema','Ajuda'],
+    toolbar: () => tb([['', 'none', 'Exibir <-> Modificar', IC.pen], ['Entradas novas', 'none', '', IC.newent], ['', 'none', 'Copiar como...', IC.copy], ['', 'none', 'Eliminar', IC.del], ['', 'prevrec', 'Entrada anterior', IC.prev], ['', 'nextrec', 'Entrada seguinte', IC.next], ['', 'none', 'Desfazer modificação', IC.undo]]),
+    render: (s) => detailHtml(s),
+  },
+
+  v07_list: {
+    title: () => "Modificar visão 'Seqüências de acesso': síntese",
+    menu: ['Visão de tabela','Processar','Ir para','Seleção','Utilitários','Sistema','Ajuda'],
+    toolbar: () => vmToolbar(false),
+    tree: () => [{id:'seq', label:'Seqüências de acesso', lvl:0, cur:true}, {id:'acc', label:'Acessos', lvl:1}, {id:'fld', label:'Campos', lvl:2}],
+    cols: [{k:'seq', l:'Seq.acesso', w:70, key:true}, {k:'desc', l:'Denominação', w:260}, {k:'type', l:'Ctg.seq.', w:60}],
+    rows: () => ACCSEQ,
+    render: (s) => gridHtml(s, 'Seqüências de acesso'),
+  },
+
+  v07_acc: {
+    title: () => "Modificar visão 'Acessos': síntese",
+    menu: ['Visão de tabela','Processar','Ir para','Seleção','Utilitários','Sistema','Ajuda'],
+    toolbar: () => vmToolbar(false),
+    tree: () => [{id:'seq', label:'Seqüências de acesso', lvl:0}, {id:'acc', label:'Acessos', lvl:1, cur:true}, {id:'fld', label:'Campos', lvl:2}],
+    cols: [{k:'nr', l:'Nº', w:34, key:true}, {k:'tab', l:'Tab.', w:40}, {k:'desc', l:'Descrição', w:300}, {k:'req', l:'Requisito', w:60}, {k:'excl', l:'Exclusivo', ck:true}],
+    rows: (p) => (ACCESSES[p.seq] || []).map(a => ({nr:a[0], tab:a[1], desc:a[2], req:a[3], excl:a[4]})),
+    render: (s) => {
+      const sq = ACCSEQ.find(x => x.seq === s.p.seq);
+      return `<div class="frow" style="margin-bottom:8px"><span class="flabel" style="width:90px">Seq.acesso</span><span class="fld ro" style="width:60px">${esc(s.p.seq)}</span><span class="ftext">${esc(sq ? sq.desc : '')}</span></div>`
+        + `<div style="color:var(--blue);font-weight:600;margin:6px 0 4px">Síntese acessos</div>` + gridHtml(s, 'Acessos');
+    },
+  },
+
+  v07_fld: {
+    title: () => "Modificar visão 'Campos': síntese",
+    menu: ['Visão de tabela','Processar','Ir para','Seleção','Utilitários','Sistema','Ajuda'],
+    toolbar: () => vmToolbar(false),
+    tree: () => [{id:'seq', label:'Seqüências de acesso', lvl:0}, {id:'acc', label:'Acessos', lvl:1}, {id:'fld', label:'Campos', lvl:2, cur:true}],
+    cols: [{k:'cond', l:'Condição', w:70, key:true}, {k:'desc', l:'Descrição', w:200}, {k:'str', l:'Estr.doc.', w:60}, {k:'docf', l:'Campo doc.', w:70}, {k:'arrow', l:'', w:20}, {k:'acct', l:'Tp.acesso', w:60}],
+    rows: (p) => (FIELDS[p.tab] || [['—','Sem campos cadastrados','','']]).map(f => ({cond:f[0], desc:f[1], str:f[2], docf:f[3], arrow:'⟵', acct:''})),
+    render: (s) => `<div class="frow"><span class="flabel" style="width:90px">Seq.acesso</span><span class="fld ro" style="width:60px">${esc(s.p.seq)}</span></div>`
+      + `<div class="frow" style="margin-bottom:8px"><span class="flabel" style="width:90px">Acesso</span><span class="fld ro" style="width:40px">${esc(s.p.nr)}</span><span class="ftext">Tabela ${esc(s.p.tab)}</span></div>` + gridHtml(s, 'Campos'),
+  },
+};
+
+function tb(items) {
+  return items.map(([label, act, title, icon]) => `<button class="tbtn" data-a="${act}" title="${esc(title || label)}">${icon || ''}${label ? esc(label) : ''}</button>`).join('');
+}
+function vmToolbar(withDetail) {
+  const it = [['', 'none', 'Exibir <-> Modificar', IC.pen], ['Entradas novas', 'none', '', IC.newent], ['', 'none', 'Copiar como... (F6)', IC.copy], ['', 'none', 'Eliminar', IC.del], ['', 'none', 'Desfazer modificação', IC.undo]];
+  if (withDetail) it.splice(1, 0, ['', 'detail', 'Detalhe (F2)', IC.detail]);
+  it.push(['', 'selall', 'Marcar tudo (F7)', IC.selall], ['', 'selblk', 'Marcar bloco (F8)', IC.selblk], ['', 'desel', 'Desmarcar tudo (F9)', IC.desel]);
+  return tb(it);
+}
+
+/* ================= RENDER ================= */
+const cur = () => stack[stack.length - 1];
+
+function render() {
+  const s = cur();
+  const def = SCREENS[s.id];
+  $('#title').textContent = def.title(s.p);
+  $('#menubar').innerHTML = def.menu.map(m => `<span class="m">${esc(m)}</span>`).join('') + '<span class="sap-logo">SAP</span>';
+  $('#apptb').innerHTML = def.toolbar(s.p);
+  const treeHtml = def.tree ? `<div class="tree"><div class="th">Estrutura de diálogo</div><ul>${def.tree(s.p).map(n =>
+    `<li class="${n.cur ? 'cur' : ''} ${s.treeSel === n.id ? 'on' : ''}" data-node="${n.id}" style="padding-left:${6 + n.lvl * 16}px"><span class="twig">${n.lvl < def.tree().length - 1 ? '&#9662;' : ''}</span>${n.cur ? IC.folderopen : IC.folder}<span class="lbl">${esc(n.label)}</span></li>`).join('')}</ul></div>` : '';
+  if (s.id === 'home') $('#content').innerHTML = def.render(s);
+  else $('#content').innerHTML = treeHtml + `<div class="main" id="main">${def.render(s)}</div>`;
+  $('#i-back').disabled = s.id === 'home';
+  $('#i-exit').disabled = s.id === 'home';
+  $('#i-cancel').disabled = s.id === 'home';
+  if (s.scrollTo != null) {
+    const row = document.querySelector(`tr[data-r="${s.scrollTo}"]`);
+    const sc = document.querySelector('.tc-scroll');
+    if (row && sc) sc.scrollTop = row.offsetTop - row.parentNode.parentNode.querySelector('th').offsetHeight;
+    s.scrollTo = null;
+  } else if (s.scroll) {
+    const sc = document.querySelector('.tc-scroll'); if (sc) sc.scrollTop = s.scroll;
+  }
+  trackProgress();
+}
+
+function gridHtml(s, label) {
+  const def = SCREENS[s.id];
+  const rows = def.rows(s.p);
+  const head = `<tr><th class="rs"></th>${def.cols.map(c => `<th style="${c.w ? `min-width:${c.w}px` : ''}" class="${c.ck ? 'c' : ''}">${esc(c.l)}</th>`).join('')}</tr>`;
+  const body = rows.map((r, i) => {
+    const cls = [s.sel.has(i) ? 'sel' : '', s.hl === i ? 'hl' : ''].join(' ');
+    return `<tr data-r="${i}" class="${cls}"><td class="rs"><div class="rsb"></div></td>${def.cols.map(c => {
+      if (c.ck) return `<td class="c"><span class="chk ${c.key ? 'ro' : ''}">${r[c.k] ? '&#10004;' : ''}</span></td>`;
+      const v = r[c.k] ?? '';
+      const hit = s.hl === i && s.hitCol === c.k ? ' hit' : '';
+      return `<td><div class="cell ${c.key ? 'key' : ''}${hit}" style="${c.w ? `width:${c.w}px` : ''}">${esc(v)}</div></td>`;
+    }).join('')}</tr>`;
+  }).join('');
+  return `<div class="tc"><div class="tc-scroll" id="tcs"><table class="grid">${head}${body}</table></div></div>
+    <div class="tcfoot"><button class="btn" data-a="position">Posicionar...</button><span class="entry">Entrada ${rows.length ? (s.hl != null ? s.hl + 1 : 1) : 0} de ${rows.length}</span></div>`;
+}
+
+function detailHtml(s) {
+  const c = CTYPES.find(x => x.ctyp === s.p.ctyp) || CTYPES[0];
+  const sq = ACCSEQ.find(x => x.seq === c.seq);
+  const fr = (label, val, txt, w = 60, ro = false) => `<div class="frow"><span class="flabel">${label}</span><span class="fld ${ro ? 'ro' : ''}" style="width:${w}px">${esc(val)}</span>${txt ? `<span class="ftext">${esc(txt)}</span>` : ''}</div>`;
+  const ck = (label, on) => `<div class="frow"><span class="flabel">${label}</span><span class="chk">${on ? '&#10004;' : ''}</span></div>`;
+  const isPrice = c.cls === 'B';
+  return `
+    <div class="frow"><span class="flabel">Tipo de condição</span><span class="fld ro" style="width:60px">${esc(c.ctyp)}</span><span class="fld" style="width:200px">${esc(c.desc)}</span>
+      <span style="margin-left:24px" class="flabel" >Seq. de acesso</span><span class="fld" style="width:60px" id="seqfld">${esc(c.seq)}</span><span class="ftext">${esc(sq ? sq.desc : '')}</span>
+      <button class="btn" style="margin-left:10px" data-a="none">Registros p/ acessos</button></div>
+    <div class="group"><div class="gt">Dados de controle 1</div><div class="gb">
+      <div>${fr('Classe de condição', c.cls, CLASS_TXT[c.cls], 30)}${fr('Regra de cálculo', c.calc, CALC_TXT[c.calc], 30)}${fr('Tipo de condição', '', c.cat, 30)}</div>
+      <div>${fr('Regra arredondamento', '', 'Arredondamento comercial', 30)}${fr('Condição estrutural', '', '', 30)}${ck('Mais/menos', false)}</div>
+    </div></div>
+    <div class="group"><div class="gt">Condição de grupo</div><div class="gb">
+      <div>${ck('Condição de grupo', false)}${fr('Rotina cond. grupo', '', '', 30)}</div>
+      <div>${ck('Arred. dif. compensar', false)}</div>
+    </div></div>
+    <div class="group"><div class="gt">Possibilidades de modificação</div><div class="gb">
+      <div>${fr('Entrada manual', isPrice ? '' : 'C', isPrice ? 'Sem limitação' : 'Entrada manual tem prioridade', 30)}${ck('Elim.', true)}${ck('Valor/percentual', true)}</div>
+      <div>${ck('Cabeçalho condição', false)}${ck('Condição de item', true)}${ck('Quantidade', false)}${ck('Cálculo', false)}</div>
+    </div></div>
+    <div class="group"><div class="gt">Registros mestres</div><div class="gb">
+      <div>${fr('Válido de', '', 'Data de hoje', 30)}${fr('Válido até', '31.12.9999', '', 80)}${fr('Esquema de preço', isPrice ? 'PR0000' : '', '', 70)}</div>
+      <div>${fr('Ref. tipo condição', '', '', 60)}${fr('Ref. aplicação', '', '', 30)}${ck('Elim. BD', false)}${ck('Texto condição', false)}</div>
+    </div></div>
+    <div class="group"><div class="gt">Escalas</div><div class="gb">
+      <div>${fr('Base da escala', isPrice ? 'C' : 'B', isPrice ? 'Base de quantidade' : 'Base de valor', 30)}${fr('Verificação', 'A', 'Ascendente', 30)}</div>
+      <div>${fr('Tipo de escala', '', 'Pode ser def. em registro', 30)}${fr('Unid. escala', '', '', 40)}</div>
+    </div></div>`;
+}
+
+function homeHtml() {
+  const folder = (t, lvl, open) => `<li style="padding-left:${8 + lvl * 16}px;display:flex;gap:4px;align-items:center"><span class="twig" style="width:12px;font-size:9px;color:#777">${open ? '&#9662;' : '&#9656;'}</span>${open ? IC.folderopen : IC.folder}<span>${t}</span></li>`;
+  const tx = (code, t, lvl) => `<li data-tx="${code}" style="padding-left:${8 + lvl * 16}px;display:flex;gap:4px;align-items:center;cursor:default" title="Duplo clique para executar"><span style="width:12px"></span>${IC.tx}<span>${code} - ${t}</span></li>`;
+  return `<div class="ea"><ul class="eatree" style="list-style:none;margin:0">
+    <li style="padding-left:8px;display:flex;gap:4px;align-items:center"><span class="twig" style="width:12px;font-size:9px;color:#777">&#9662;</span>${IC.star}<span>Favoritos</span></li>
+    ${tx('V/08', 'Condições: esquemas de cálculo', 1)}${tx('V/06', 'Condições: tipos de condição', 1)}${tx('V/07', 'Condições: seqüências de acesso', 1)}
+    ${folder('Menu SAP', 0, true)}${folder('Office', 1)}${folder('Componentes multiaplicação', 1)}${folder('Logística', 1, true)}
+    ${folder('Gestão de materiais', 2)}${folder('Vendas e distribuição', 2)}${folder('Logistics Execution', 2)}${folder('Produção', 2)}
+    ${folder('Contabilidade', 1)}${folder('Recursos Humanos', 1)}${folder('Sistemas de informação', 1)}${folder('Ferramentas', 1)}
+  </ul><div class="eaimg"><div class="lg">SAP</div></div></div>`;
+}
+
+/* ================= STATUS ================= */
+function msg(type, text) {
+  $('#msg').innerHTML = text ? `${IC['msg' + type]}<span>${esc(text)}</span>` : '';
+}
+
+/* ================= NAVEGAÇÃO ================= */
+function push(id, p = {}) {
+  const s = cur(); if (s) { const sc = document.querySelector('.tc-scroll'); s.scroll = sc ? sc.scrollTop : 0; }
+  stack.push({id, p, sel: new Set(), hl: null, hitCol: null, treeSel: null});
+  render();
+}
+function startTx(code) {
+  tcode = code;
+  stack = [{id:'home', p:{}, sel:new Set()}];
+  const map = {'V/08':'v08_list', 'V/06':'v06_list', 'V/07':'v07_list'};
+  push(map[code]);
+  msg('', '');
+  if (code === 'V/08') mark('s2');
+}
+function goHome() { tcode = ''; stack = [{id:'home', p:{}, sel:new Set()}]; render(); }
+function back() {
+  if (stack.length <= 1) return;
+  stack.pop();
+  if (stack.length === 1) tcode = '';
+  msg('', ''); render();
+}
+
+function runCommand(raw) {
+  const v = raw.trim().toUpperCase();
+  $('#cmd').value = '';
+  if (!v) return;
+  const known = ['V/08', 'V/06', 'V/07'];
+  if (v === '/N' || v === '/NEX' || v === '/I') { goHome(); msg('', ''); return; }
+  let code = v, fresh = false;
+  if (v.startsWith('/N') || v.startsWith('/O')) { code = v.slice(2); fresh = true; }
+  if (!fresh && cur().id !== 'home') { msg('E', `Função "${v}" não é possível (utilize /n${v} para mudar de transação)`); return; }
+  if (!known.includes(code)) { msg('E', `A transação ${code} não existe`); return; }
+  startTx(code);
+}
+
+/* ================= SELEÇÃO / AÇÕES ================= */
+function firstSel(s) { return s.sel.size ? Math.min(...s.sel) : null; }
+
+function treeNav(node) {
+  const s = cur();
+  if (s.id === 'v08_list' && node === 'steps') {
+    const i = firstSel(s);
+    if (i == null) { msg('E', 'Marcar uma entrada (Procedimentos)'); return; }
+    const proc = PROCEDURES[i].proc;
+    push('v08_steps', {proc});
+    if (proc === 'RVAA01') mark('s3');
+    return;
+  }
+  if (s.id === 'v08_steps' && node === 'proc') { back(); return; }
+  if (s.id === 'v07_list' && (node === 'acc' || node === 'fld')) {
+    const i = firstSel(s);
+    if (i == null) { msg('E', 'Marcar uma entrada (Seqüências de acesso)'); return; }
+    const seq = ACCSEQ[i].seq;
+    push('v07_acc', {seq});
+    if (node === 'fld') treeNav('fld');
+    return;
+  }
+  if (s.id === 'v07_acc') {
+    if (node === 'seq') { back(); return; }
+    if (node === 'fld') {
+      const i = firstSel(s);
+      const rows = SCREENS.v07_acc.rows(s.p);
+      if (i == null) { msg('E', 'Marcar uma entrada (Acessos)'); return; }
+      push('v07_fld', {seq: s.p.seq, nr: rows[i].nr, tab: rows[i].tab});
+      return;
+    }
+  }
+  if (s.id === 'v07_fld') {
+    if (node === 'acc') { back(); return; }
+    if (node === 'seq') { stack.pop(); back(); return; }
+  }
+}
+
+function action(a) {
+  const s = cur();
+  switch (a) {
+    case 'enter': if ($('#cmd').value.trim()) runCommand($('#cmd').value); else msg('', ''); break;
+    case 'back': case 'cancel': back(); break;
+    case 'exit': goHome(); msg('', ''); break;
+    case 'save': msg(s.id === 'home' ? 'E' : 'S', s.id === 'home' ? 'Função não disponível' : 'Não foram modificados dados'); break;
+    case 'find': openFind(); break;
+    case 'findnext': if (lastFind) doFind(lastFind, true); else openFind(); break;
+    case 'top': case 'bottom': case 'pgup': case 'pgdn': page(a); break;
+    case 'help': msg('I', 'Clique no botão de roteiro (ícone de documento) para ver os passos do exercício'); break;
+    case 'roteiro': toggleSide(); break;
+    case 'detail': detail(); break;
+    case 'selall': if (SCREENS[s.id].rows) { SCREENS[s.id].rows(s.p).forEach((_, i) => s.sel.add(i)); render(); } break;
+    case 'selblk': msg('I', 'Marque o início e o fim do bloco'); break;
+    case 'desel': s.sel.clear(); render(); break;
+    case 'position': openFind('Posicionar'); break;
+    case 'prevrec': case 'nextrec': stepRecord(a === 'nextrec' ? 1 : -1); break;
+    default: msg('W', 'Função não implementada neste mini SAP');
+  }
+}
+
+function detail() {
+  const s = cur();
+  if (s.id !== 'v06_list') return;
+  let i = firstSel(s);
+  if (i == null && s.hl != null) i = s.hl;
+  if (i == null) { msg('E', 'Posicione o cursor numa linha ou marque uma entrada'); return; }
+  const ctyp = CTYPES[i].ctyp;
+  push('v06_detail', {ctyp});
+  if (ctyp === 'PR00') mark('s5');
+}
+function stepRecord(d) {
+  const s = cur();
+  const i = CTYPES.findIndex(c => c.ctyp === s.p.ctyp) + d;
+  if (i < 0 || i >= CTYPES.length) { msg('W', 'Não existem mais entradas'); return; }
+  s.p = {ctyp: CTYPES[i].ctyp}; render();
+}
+function page(a) {
+  const sc = document.querySelector('.tc-scroll') || $('#main');
+  if (!sc) return;
+  const h = sc.clientHeight - 30;
+  sc.scrollTop = a === 'top' ? 0 : a === 'bottom' ? sc.scrollHeight : sc.scrollTop + (a === 'pgdn' ? h : -h);
+}
+
+/* ================= PROCURAR (Ctrl+F) ================= */
+function openFind(title = 'Procurar') {
+  const s = cur();
+  if (!SCREENS[s.id].rows) { msg('E', 'Função de procura não disponível nesta tela'); return; }
+  dlgOpen = true;
+  const o = document.createElement('div');
+  o.className = 'ovl';
+  o.innerHTML = `<div class="dlg"><div class="dt"><span>${title}</span><span style="cursor:pointer" data-x>&times;</span></div>
+    <div class="db"><div class="frow"><span class="flabel" style="width:110px">Termo de procura</span><input id="fterm" value="${esc(lastFind)}"></div>
+    <div class="frow" style="margin-top:6px;color:#666"><span class="chk" style="margin-right:4px">&#10004;</span> Procurar em todas as colunas</div></div>
+    <div class="df"><button class="btn" data-ok>${IC.enter} Procurar</button><button class="btn" data-x>${IC.cancel} Cancelar</button></div></div>`;
+  document.body.appendChild(o);
+  const inp = o.querySelector('#fterm'); inp.focus(); inp.select();
+  const close = () => { o.remove(); dlgOpen = false; };
+  const ok = () => { const t = inp.value.trim(); close(); if (t) doFind(t, false); };
+  o.querySelectorAll('[data-x]').forEach(b => b.onclick = close);
+  o.querySelector('[data-ok]').onclick = ok;
+  inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } if (e.key === 'Escape' || e.key === 'F12') { e.preventDefault(); close(); } };
+}
+function doFind(term, next) {
+  const s = cur();
+  const def = SCREENS[s.id];
+  if (!def.rows) return;
+  lastFind = term;
+  const rows = def.rows(s.p);
+  const T = term.toUpperCase();
+  const start = next && s.hl != null ? s.hl + 1 : 0;
+  for (let n = 0; n < rows.length; n++) {
+    const i = (start + n) % rows.length;
+    const col = def.cols.find(c => !c.ck && String(rows[i][c.k] ?? '').toUpperCase().includes(T));
+    if (col) {
+      s.hl = i; s.hitCol = col.k; s.scrollTo = i;
+      render();
+      msg('S', `Termo de procura "${term}" encontrado (linha ${i + 1})`);
+      if (s.id === 'v08_steps' && s.p.proc === 'RVAA01') {
+        const ct = rows[i].ctyp;
+        if (['PR00','K004','K005','K007','MWST'].includes(ct) && ct === T && !progress.s4.includes(ct)) { progress.s4.push(ct); saveProg(); }
+      }
+      return;
+    }
+  }
+  msg('W', `Termo de procura "${term}" não encontrado`);
+}
+
+/* ================= ROTEIRO ================= */
+function mark(k) { if (!progress[k]) { progress[k] = true; saveProg(); } }
+function saveProg() { store.set('progress', progress); renderSteps(); }
+function trackProgress() {
+  const s = cur();
+  if (s.id === 'v07_acc' && s.p.seq === 'PR02') mark('s6');
+}
+function renderSteps() {
+  const all = ['PR00','K004','K005','K007','MWST'];
+  const items = [
+    ['s1', 'Abra o SAP GUI e entre no ambiente do curso', progress.s1],
+    ['s2', 'Na barra de comando digite <b>V/08</b> e dê Enter', progress.s2],
+    ['s3', 'Selecione o esquema <b>RVAA01</b> e dê duplo clique em <b>Etapas de controle</b> (menu da esquerda)', progress.s3],
+    ['s4', 'Use <kbd>Ctrl+F</kbd> e ache as linhas <b>PR00, K004, K005, K007 e MWST</b>. Anote no caderno o número da etapa de cada uma'
+      + `<div class="chips">${all.map(c => `<span class="chip ${progress.s4.includes(c) ? 'ok' : ''}">${c}</span>`).join('')}</div>`, progress.s4.length === all.length],
+    ['s5', 'Digite <b>/nV/06</b>, selecione <b>PR00</b> e clique na lupa. Anote qual é a <b>sequência de acesso</b> dela (deve ser PR02)', progress.s5],
+    ['s6', 'Digite <b>/nV/07</b>, selecione <b>PR02</b> e clique em <b>Acessos</b>. Anote quais tabelas ela consulta e em que ordem', progress.s6],
+    ['s7', 'No caderno, desenhe: OV → RVAA01 → PR00 → PR02 → tabelas → valor <span style="color:#999">(marque manualmente)</span>', progress.s7, true],
+  ];
+  $('#steps').innerHTML = items.map(([k, t, done, manual]) => `<div class="step ${done ? 'done' : ''} ${manual ? 'manual' : ''}" data-step="${k}"><span class="ck">${done ? '&#10004;' : ''}</span><span class="tx">${t}</span></div>`).join('')
+    + `<div style="margin-top:8px"><button class="btn" id="resetprog">Reiniciar progresso</button></div>`;
+}
+function toggleSide(force) {
+  const open = force ?? !$('#side').classList.contains('open');
+  $('#side').classList.toggle('open', open);
+  store.set('side', open);
+}
+
+/* ================= EVENTOS ================= */
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-a]');
+  if (a && !a.disabled) { action(a.dataset.a); return; }
+  const rsb = e.target.closest('td.rs');
+  const tr = e.target.closest('tr[data-r]');
+  if (tr) {
+    const s = cur(); const i = +tr.dataset.r;
+    if (rsb) { s.sel.has(i) ? s.sel.delete(i) : s.sel.add(i); tr.classList.toggle('sel', s.sel.has(i)); }
+    else {
+      s.hl = i; s.hitCol = null;
+      document.querySelectorAll('tr.hl').forEach(r => r.classList.remove('hl'));
+      document.querySelectorAll('.cell.hit').forEach(c => c.classList.remove('hit'));
+      tr.classList.add('hl');
+    }
+    return;
+  }
+  const node = e.target.closest('[data-node]');
+  if (node) {
+    cur().treeSel = node.dataset.node;
+    document.querySelectorAll('.tree li.on').forEach(l => l.classList.remove('on'));
+    node.classList.add('on');
+    if (e.detail === 1) msg('I', 'Dê um duplo clique para navegar');
+    return;
+  }
+  const step = e.target.closest('.step.manual');
+  if (step) { progress[step.dataset.step] = !progress[step.dataset.step]; saveProg(); return; }
+  if (e.target.id === 'resetprog') { Object.assign(progress, {s2:false, s3:false, s4:[], s5:false, s6:false, s7:false}); saveProg(); return; }
+  if (e.target.closest('.menubar .m')) { menuDrop(e.target.closest('.m')); return; }
+  closeMenus();
+});
+document.addEventListener('dblclick', e => {
+  const node = e.target.closest('[data-node]');
+  if (node) { msg('', ''); treeNav(node.dataset.node); return; }
+  const tx = e.target.closest('[data-tx]');
+  if (tx) { startTx(tx.dataset.tx); return; }
+  const tr = e.target.closest('tr[data-r]');
+  if (tr && !e.target.closest('td.rs')) {
+    const s = cur(); const i = +tr.dataset.r;
+    if (s.id === 'v06_list') { s.sel = new Set([i]); detail(); }
+    else if (s.id === 'v07_acc') { s.sel = new Set([i]); treeNav('fld'); }
+  }
+});
+function closeMenus() { document.querySelectorAll('.dropdown').forEach(d => d.remove()); }
+function menuDrop(m) {
+  const had = m.querySelector('.dropdown'); closeMenus(); if (had) return;
+  const name = m.textContent;
+  const items = name === 'Ajuda' ? [['Roteiro do exercício', 'roteiro'], ['Ajuda de aplicação', null], ['Glossário SAP', null]]
+    : name === 'Sistema' ? [['Criar modo', null], ['Encerrar modo', null], ['Status...', null], ['Logoff', null]]
+    : name === 'Processar' || name === 'Visão de tabela' ? [['Procurar...    Ctrl+F', 'find'], ['Continuar procura    Ctrl+G', 'findnext'], ['Voltar    F3', 'back'], ['Encerrar    Shift+F3', 'exit']]
+    : [['(sem funções)', null]];
+  const d = document.createElement('div'); d.className = 'dropdown';
+  d.innerHTML = items.map(([t, a]) => `<div ${a ? `data-a="${a}"` : 'class="dis"'}>${esc(t)}</div>`).join('');
+  m.appendChild(d);
+}
+
+$('#cmd').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runCommand(e.target.value); } });
+document.addEventListener('keydown', e => {
+  if (dlgOpen) return;
+  const k = e.key;
+  if (e.ctrlKey && (k === 'f' || k === 'F')) { e.preventDefault(); openFind(); }
+  else if (e.ctrlKey && (k === 'g' || k === 'G')) { e.preventDefault(); action('findnext'); }
+  else if (e.ctrlKey && (k === 's' || k === 'S')) { e.preventDefault(); action('save'); }
+  else if (e.ctrlKey && k === '/') { e.preventDefault(); $('#cmd').focus(); }
+  else if (k === 'F3' && e.shiftKey) { e.preventDefault(); action('exit'); }
+  else if (k === 'F3' || k === 'F12') { e.preventDefault(); back(); }
+  else if (k === 'F2') { e.preventDefault(); action('detail'); }
+  else if (k === 'F7') { e.preventDefault(); action('selall'); }
+  else if (k === 'F9') { e.preventDefault(); action('desel'); }
+  else if (k === 'F1') { e.preventDefault(); toggleSide(true); }
+  else if (k === 'Enter' && document.activeElement !== $('#cmd') && !document.activeElement.closest('.side')) { const s = cur(); if (s.id === 'v06_list' && s.hl != null) { /* SAP: Enter não navega */ } msg('', ''); }
+  else if (k === 'Escape') closeMenus();
+});
+
+$('#tabrot').onclick = () => toggleSide(true);
+$('#closeside').onclick = () => toggleSide(false);
+$('#showflow').onclick = () => { const f = $('#flow'); f.hidden = !f.hidden; $('#showflow').textContent = f.hidden ? 'Mostrar gabarito' : 'Ocultar gabarito'; };
+$('#notes').value = store.get('notes', '');
+$('#notes').addEventListener('input', e => store.set('notes', e.target.value));
+
+/* ================= INÍCIO ================= */
+renderSteps();
+toggleSide(store.get('side', true));
+goHome();
+msg('S', 'Bem-vindo ao mini SAP — digite V/08 na barra de comando');
+$('#cmd').focus();
+</script>
+</body>
+</html>
